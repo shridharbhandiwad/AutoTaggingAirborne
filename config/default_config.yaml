@@ -1,0 +1,83 @@
+# Default Configuration for Radar Target Behavior Analysis System
+
+# Data Processing Settings
+data_processing:
+  chunk_size: 10000  # Number of samples to process at once
+  sampling_rate: 1000  # Hz
+  buffer_size: 4096
+
+# Feature Extraction Parameters
+features:
+  velocity_threshold:
+    high_speed: 300.0  # m/s
+    medium_speed: 150.0  # m/s
+    low_speed: 50.0  # m/s
+  
+  acceleration_threshold:
+    high_g: 5.0  # g-force
+    medium_g: 2.0  # g-force
+  
+  trajectory:
+    sharp_turn_angle: 45.0  # degrees
+    smooth_turn_angle: 15.0  # degrees
+    window_size: 10  # samples for trajectory analysis
+  
+  radar_signature:
+    doppler_range: [-1000, 1000]  # Hz
+    rcs_threshold: -10  # dBsm
+
+# Behavior Tags
+behavior_tags:
+  - high_speed
+  - medium_speed
+  - low_speed
+  - g_turn
+  - sharp_trajectory
+  - smooth_trajectory
+  - hovering
+  - ascending
+  - descending
+  - evasive_maneuver
+
+# C++/MATLAB Integration
+external_algorithms:
+  cpp_lib_path: "lib/radar_algorithms.so"
+  matlab_enabled: false
+  matlab_functions:
+    - "sar_processing"
+    - "doppler_analysis"
+    - "clutter_rejection"
+
+# Synthetic Data Generation
+synthetic_data:
+  num_samples: 10000
+  duration: 60.0  # seconds
+  noise_level: 0.05
+  num_targets: 5
+  target_types:
+    - aircraft
+    - helicopter
+    - drone
+    - missile
+
+# GUI Settings
+gui:
+  theme: "light"
+  window_size: [1200, 800]
+  plot_update_interval: 100  # ms
+  max_display_points: 5000
+
+# Output Settings
+output:
+  save_format: "hdf5"  # Options: hdf5, csv, npz
+  compression: true
+  dataset_split:
+    train: 0.7
+    validation: 0.15
+    test: 0.15
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "logs/radar_analyzer.log"
+  console: true
