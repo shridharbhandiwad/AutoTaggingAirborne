@@ -13,9 +13,14 @@ matplotlib>=3.7.0
 h5py>=3.8.0
 pillow>=9.5.0
 
-# C++/MATLAB Integration
-cffi>=1.15.1
-matlab-engine>=9.13.0  # Optional, install separately if MATLAB is available
+# C++ Integration and FFI
+cffi>=1.15.1          # C Foreign Function Interface for calling C/C++ libraries
+pybind11>=2.11.0      # Modern C++ binding generator for Python
+ctypes-wrapper>=1.0.0 # Additional ctypes utilities (optional)
+
+# Signal Processing (MATLAB alternative functionality)
+numba>=0.57.0         # JIT compiler for accelerated numerical computing
+opencv-python>=4.8.0  # Computer vision and image processing (SAR image processing)
 
 # Machine Learning (for feature extraction and classification)
 scikit-learn>=1.2.0

@@ -1,7 +1,8 @@
 """
 External Algorithm Interface Module
 
-Provides interface to call C++ and MATLAB algorithms for radar processing.
+Provides interface to call C++ algorithms for radar processing.
+Supports both ctypes and CFFI for flexible C++ library integration.
 """
 
 import logging
@@ -16,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 class ExternalAlgorithmInterface:
     """
-    Interface for calling external C++ and MATLAB algorithms.
+    Interface for calling external C++ algorithms via ctypes/CFFI.
+    Provides Python fallbacks for all algorithms when C++ libraries are not available.
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -24,107 +26,150 @@ class ExternalAlgorithmInterface:
         Initialize external algorithm interface.
         
         Args:
-            config: Configuration dictionary
+            config: Configuration dictionary with 'cpp_lib_path' and 'use_cffi'
         """
         self.config = config or {}
         self.cpp_lib_path = self.config.get('cpp_lib_path')
-        self.matlab_enabled = self.config.get('matlab_enabled', False)
-        self.matlab_engine = None
+        self.use_cffi = self.config.get('use_cffi', False)
+        self.cpp_lib = None
+        self.ffi = None
         
         # Try to load C++ library
         self._load_cpp_library()
-        
-        # Try to initialize MATLAB engine
-        if self.matlab_enabled:
-            self._init_matlab_engine()
     
     def _load_cpp_library(self):
-        """Load C++ shared library using ctypes/cffi."""
+        """
+        Load C++ shared library using ctypes or CFFI.
+        
+        Supported library extensions:
+        - Linux: .so
+        - Windows: .dll
+        - macOS: .dylib
+        """
         if not self.cpp_lib_path:
-            logger.info("C++ library path not specified. Using Python fallback.")
+            logger.info("C++ library path not specified. Using Python fallback implementations.")
             return
         
         lib_path = Path(self.cpp_lib_path)
         if not lib_path.exists():
-            logger.warning(f"C++ library not found: {self.cpp_lib_path}")
+            logger.warning(f"C++ library not found: {self.cpp_lib_path}. Using Python fallback.")
             return
         
         try:
-            import ctypes
-            self.cpp_lib = ctypes.CDLL(str(lib_path))
-            logger.info(f"Loaded C++ library: {self.cpp_lib_path}")
+            if self.use_cffi:
+                # Use CFFI for C++ library loading
+                from cffi import FFI
+                self.ffi = FFI()
+                
+                # Define C interface (user should provide this in config or separate file)
+                # This is an example interface definition
+                self.ffi.cdef("""
+                    void sar_processing(double* input, double* output, int size);
+                    void doppler_analysis(double* input, double* output, int size);
+                    void pulse_compression(double* input, double* output, int size);
+                    void clutter_rejection(double* input, double* output, int size);
+                """)
+                
+                self.cpp_lib = self.ffi.dlopen(str(lib_path))
+                logger.info(f"Loaded C++ library via CFFI: {self.cpp_lib_path}")
+            else:
+                # Use ctypes for C++ library loading
+                import ctypes
+                self.cpp_lib = ctypes.CDLL(str(lib_path))
+                logger.info(f"Loaded C++ library via ctypes: {self.cpp_lib_path}")
+                
+                # Define function signatures for ctypes
+                # Example for a function: double* func(double* input, int size)
+                # self.cpp_lib.sar_processing.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_int]
+                # self.cpp_lib.sar_processing.restype = ctypes.POINTER(ctypes.c_double)
+                
         except Exception as e:
             logger.error(f"Failed to load C++ library: {e}")
+            logger.info("Falling back to Python implementations")
             self.cpp_lib = None
+            self.ffi = None
     
-    def _init_matlab_engine(self):
-        """Initialize MATLAB engine."""
-        try:
-            import matlab.engine
-            self.matlab_engine = matlab.engine.start_matlab()
-            logger.info("MATLAB engine initialized successfully")
-        except ImportError:
-            logger.warning("MATLAB engine not available. Install matlab-engine package.")
-            self.matlab_enabled = False
-        except Exception as e:
-            logger.error(f"Failed to initialize MATLAB engine: {e}")
-            self.matlab_enabled = False
     
     def call_cpp_algorithm(self, algorithm_name: str, 
                           input_data: np.ndarray,
                           params: Optional[Dict[str, Any]] = None) -> np.ndarray:
         """
-        Call a C++ algorithm function.
+        Call a C++ algorithm function via ctypes or CFFI.
         
         Args:
-            algorithm_name: Name of the algorithm
-            input_data: Input numpy array
-            params: Algorithm parameters
+            algorithm_name: Name of the algorithm (e.g., 'sar_processing', 'doppler_analysis')
+            input_data: Input numpy array (complex64 or float64)
+            params: Algorithm parameters dictionary
             
         Returns:
             Result numpy array
+            
+        Supported algorithms:
+            - sar_processing: SAR image formation
+            - doppler_analysis: Doppler spectrum analysis
+            - pulse_compression: Matched filter pulse compression
+            - clutter_rejection: MTI filter for clutter suppression
         """
-        if not hasattr(self, 'cpp_lib') or self.cpp_lib is None:
-            logger.info(f"Using Python fallback for {algorithm_name}")
+        if self.cpp_lib is None:
+            logger.info(f"C++ library not available. Using Python fallback for {algorithm_name}")
             return self._python_fallback(algorithm_name, input_data, params)
         
-        # Call C++ function (example implementation)
         try:
-            # This is a template - actual implementation depends on C++ API
             logger.info(f"Calling C++ algorithm: {algorithm_name}")
-            result = self._python_fallback(algorithm_name, input_data, params)
-            return result
+            
+            # Ensure input data is contiguous and correct type
+            input_data = np.ascontiguousarray(input_data, dtype=np.float64)
+            output_data = np.zeros_like(input_data)
+            
+            if self.use_cffi and self.ffi is not None:
+                # CFFI approach
+                input_ptr = self.ffi.cast("double*", self.ffi.from_buffer(input_data))
+                output_ptr = self.ffi.cast("double*", self.ffi.from_buffer(output_data))
+                size = len(input_data)
+                
+                # Call the C++ function
+                func = getattr(self.cpp_lib, algorithm_name)
+                func(input_ptr, output_ptr, size)
+                
+            else:
+                # ctypes approach
+                import ctypes
+                func = getattr(self.cpp_lib, algorithm_name)
+                
+                # Set up argument and return types
+                func.argtypes = [
+                    np.ctypeslib.ndpointer(dtype=np.float64, flags='C_CONTIGUOUS'),
+                    np.ctypeslib.ndpointer(dtype=np.float64, flags='C_CONTIGUOUS'),
+                    ctypes.c_int
+                ]
+                func.restype = None
+                
+                # Call the function
+                func(input_data, output_data, len(input_data))
+            
+            logger.info(f"C++ algorithm {algorithm_name} executed successfully")
+            return output_data
+            
+        except AttributeError:
+            logger.warning(f"C++ function '{algorithm_name}' not found in library. Using Python fallback.")
+            return self._python_fallback(algorithm_name, input_data, params)
         except Exception as e:
-            logger.error(f"C++ algorithm call failed: {e}")
+            logger.error(f"C++ algorithm call failed: {e}. Using Python fallback.")
             return self._python_fallback(algorithm_name, input_data, params)
     
-    def call_matlab_function(self, function_name: str,
-                            *args,
-                            **kwargs) -> Any:
+    def get_available_algorithms(self) -> List[str]:
         """
-        Call a MATLAB function.
+        Get list of available algorithms.
         
-        Args:
-            function_name: MATLAB function name
-            *args: Function arguments
-            **kwargs: Function keyword arguments
-            
         Returns:
-            MATLAB function result
+            List of algorithm names
         """
-        if not self.matlab_enabled or self.matlab_engine is None:
-            logger.info(f"Using Python fallback for MATLAB function {function_name}")
-            return self._matlab_python_fallback(function_name, *args, **kwargs)
-        
-        try:
-            # Call MATLAB function
-            matlab_func = getattr(self.matlab_engine, function_name)
-            result = matlab_func(*args, **kwargs)
-            logger.info(f"MATLAB function {function_name} executed successfully")
-            return result
-        except Exception as e:
-            logger.error(f"MATLAB function call failed: {e}")
-            return self._matlab_python_fallback(function_name, *args, **kwargs)
+        return [
+            "sar_processing",
+            "doppler_analysis",
+            "pulse_compression",
+            "clutter_rejection"
+        ]
     
     def _python_fallback(self, algorithm_name: str,
                         input_data: np.ndarray,
@@ -146,17 +191,6 @@ class ExternalAlgorithmInterface:
             logger.warning(f"Unknown algorithm: {algorithm_name}")
             return input_data
     
-    def _matlab_python_fallback(self, function_name: str, *args, **kwargs) -> Any:
-        """
-        Python fallback for MATLAB functions.
-        """
-        if function_name == "sar_processing":
-            return self._sar_processing_fallback(args[0] if args else np.array([]), {})
-        elif function_name == "doppler_analysis":
-            return self._doppler_analysis_fallback(args[0] if args else np.array([]), {})
-        else:
-            logger.warning(f"Unknown MATLAB function: {function_name}")
-            return None
     
     def _sar_processing_fallback(self, data: np.ndarray, params: Dict) -> np.ndarray:
         """SAR image formation fallback."""
@@ -210,10 +244,10 @@ class ExternalAlgorithmInterface:
         return compressed
     
     def cleanup(self):
-        """Clean up resources."""
-        if self.matlab_engine is not None:
-            try:
-                self.matlab_engine.quit()
-                logger.info("MATLAB engine closed")
-            except Exception as e:
-                logger.error(f"Error closing MATLAB engine: {e}")
+        """
+        Clean up resources and unload libraries.
+        """
+        if self.cpp_lib is not None:
+            logger.info("Cleaning up C++ library resources")
+            self.cpp_lib = None
+            self.ffi = None
