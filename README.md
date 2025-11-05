@@ -16,7 +16,7 @@ A comprehensive Python-based system for analyzing airborne radar target behavior
   - Speed categories (high-speed, medium-speed, low-speed, hovering)
   - Maneuver patterns (G-turns, sharp trajectory, smooth trajectory, evasive maneuvers)
   - Flight profiles (ascending, descending, straight-line, spiral, loitering)
-- **External Algorithm Integration**: Interface for C++ and MATLAB algorithm integration
+- **External Algorithm Integration**: Interface for C++ algorithm integration with ctypes/CFFI support
 - **Synthetic Data Generation**: Generate realistic synthetic radar data with configurable behaviors
 - **Interactive GUI**: Full-featured PyQt5 graphical interface
 - **Command-Line Interface**: Powerful CLI for batch processing and automation
@@ -42,8 +42,8 @@ A comprehensive Python-based system for analyzing airborne radar target behavior
 ### Prerequisites
 - Python 3.8 or higher
 - pip package manager
-- (Optional) MATLAB R2021a or higher for MATLAB integration
 - (Optional) C++ compiler for custom algorithm compilation
+- (Optional) C++ shared libraries for radar processing algorithms
 
 ### Standard Installation
 
@@ -195,7 +195,7 @@ workspace/
 │   └── radar_analyzer/
 │       ├── __init__.py              # Main package
 │       ├── data_loader.py           # Data loading and I/O
-│       ├── external_interface.py    # C++/MATLAB integration
+│       ├── external_interface.py    # C++ integration
 │       ├── feature_extractor.py     # Feature extraction
 │       ├── tagging_engine.py        # Behavior tagging
 │       ├── synthetic_generator.py   # Synthetic data generation
@@ -252,10 +252,10 @@ workspace/
 - Supports multiple behavior patterns
 
 #### `external_interface.py`
-- Interfaces with C++ shared libraries
-- Calls MATLAB engine functions
-- Provides Python fallback implementations
-- Implements common radar algorithms (SAR, Doppler, MTI)
+- Interfaces with C++ shared libraries via ctypes/CFFI
+- Supports loading custom radar processing libraries
+- Provides Python fallback implementations using NumPy/SciPy
+- Implements common radar algorithms (SAR, Doppler, MTI, pulse compression)
 
 ## ⚙️ Configuration
 
@@ -284,10 +284,12 @@ features:
 ```yaml
 external_algorithms:
   cpp_lib_path: "lib/radar_algorithms.so"
-  matlab_enabled: false
-  matlab_functions:
+  use_cffi: false
+  algorithms:
     - "sar_processing"
     - "doppler_analysis"
+    - "pulse_compression"
+    - "clutter_rejection"
 ```
 
 #### Synthetic Data
@@ -478,7 +480,7 @@ Detailed documentation is available in the `docs/` directory:
 - **API.md**: Complete API reference
 - **ALGORITHMS.md**: Algorithm descriptions and mathematical details
 - **CONFIGURATION.md**: Configuration options and examples
-- **INTEGRATION.md**: Guide for C++/MATLAB integration
+- **INTEGRATION.md**: Guide for C++ library integration
 - **EXAMPLES.md**: More usage examples
 
 ## 🤝 Contributing

@@ -39,14 +39,20 @@ behavior_tags:
   - descending
   - evasive_maneuver
 
-# C++/MATLAB Integration
+# C++ Integration Settings
 external_algorithms:
+  # Path to C++ shared library (.so on Linux, .dll on Windows, .dylib on macOS)
   cpp_lib_path: "lib/radar_algorithms.so"
-  matlab_enabled: false
-  matlab_functions:
-    - "sar_processing"
-    - "doppler_analysis"
-    - "clutter_rejection"
+  
+  # Use CFFI instead of ctypes (recommended for complex C++ interfaces)
+  use_cffi: false
+  
+  # Available C++ algorithms (will use Python fallbacks if library not found)
+  algorithms:
+    - "sar_processing"        # SAR image formation
+    - "doppler_analysis"      # Doppler spectrum analysis
+    - "pulse_compression"     # Matched filter pulse compression
+    - "clutter_rejection"     # MTI filter for clutter suppression
 
 # Synthetic Data Generation
 synthetic_data:
